@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Panel Rysowania</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1e1e24;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #controls {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        #drawing-pad {
+            background: #ffffff;
+            border-radius: 8px;
+            touch-action: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+<div id="controls">
+    <button onclick="setColor('#000000')">Czarny</button>
+    <button onclick="setColor('#ff0055')">Czerwony</button>
+    <button onclick="setColor('#0099ff')">Niebieski</button>
+    <button onclick="clearCanvas()">Wyczyść</button>
+</div>
+
+<canvas id="drawing-pad"></canvas>
+
+<script>
+    const canvas = document.getElementById("drawing-pad");
+    const ctx = canvas.getContext("2d");
+
+    const size = Math.min(window.innerWidth - 20, window.innerHeight - 100);
+    canvas.width = size;
+    canvas.height = size;
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    let currentColor = "#000000";
+    let currentWidth = 4;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+    function setColor(color) { currentColor = color; }
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.send(JSON.stringify({ type: "clear" }));
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+        isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        lastX = e.clientX - rect.left;
+        lastY = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+        if (!isDrawing) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(currentX, currentY);
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = currentWidth;
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        const packet = {
+            type: "draw",
+            x0: parseFloat((lastX / canvas.width).toFixed(4)),
+            y0: parseFloat((lastY / canvas.height).toFixed(4)),
+            x1: parseFloat((currentX / canvas.width).toFixed(4)),
+            y1: parseFloat((currentY / canvas.height).toFixed(4)),
+            color: currentColor,
+            width: currentWidth
+        };
+
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(packet));
+        }
+
+        lastX = currentX;
+        lastY = currentY;
+    });
+
+    window.addEventListener("pointerup", () => isDrawing = false);
+</script>
+</body>
+</html>

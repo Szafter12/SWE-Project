@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Ekran TV / Host</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #tv-canvas {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="tv-canvas" width="800" height="800"></canvas>
+
+<script>
+  const canvas = document.getElementById("tv-canvas");
+  const ctx = canvas.getContext("2d");
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === "draw") {
+      const startX = data.x0 * canvas.width;
+      const startY = data.y0 * canvas.height;
+      const endX = data.x1 * canvas.width;
+      const endY = data.y1 * canvas.height;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = data.color;
+      ctx.lineWidth = data.width;
+      ctx.lineCap = "round";
+      ctx.stroke();
+    } else if (data.type === "clear") {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+</script>
+</body>
+</html>
